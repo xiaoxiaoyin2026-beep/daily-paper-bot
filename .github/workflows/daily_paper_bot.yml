@@ -2,9 +2,7 @@ name: Daily AI Paper Digest
 
 on:
   schedule:
-    # 设置为每天 UTC 时间 00:00 运行（对应北京时间早上 08:00）
     - cron: '0 0 * * *'
-  # 允许手动触发，方便测试
   workflow_dispatch:
 
 jobs:
@@ -27,6 +25,6 @@ jobs:
 
     - name: Run paper summarizer
       env:
-        # 将 GitHub Secrets 中的密钥注入环境变量
-        GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        PUSHPLUS_TOKEN: ${{ secrets.PUSHPLUS_TOKEN }}
       run: python main.py
