@@ -25,5 +25,6 @@ jobs:
 
     - name: Run paper summarizer
       env:
+        # 只要确保你的第三方 API Key 存在 GitHub Secrets 的 GOOGLE_API_KEY 里即可
         GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
       run: python main.py
