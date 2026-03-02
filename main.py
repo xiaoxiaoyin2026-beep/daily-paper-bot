@@ -2,16 +2,17 @@ import arxiv
 import datetime
 import os
 import requests
-from openai import OpenAI
+from google import genai
 import time
 
-# 1. 密钥读取 (修改为读取 OpenAI 的密钥)
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-if not OPENAI_API_KEY:
-    raise ValueError("未找到 OPENAI_API_KEY 环境变量，请检查 GitHub Secrets！")
+# 1. 密钥读取
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+if not GOOGLE_API_KEY:
+    raise ValueError("未找到 GOOGLE_API_KEY 环境变量，请检查 GitHub Secrets！")
 
-client = OpenAI(api_key=OPENAI_API_KEY)
-MODEL_ID = "gpt-4o-mini"
+client = genai.Client(api_key=GOOGLE_API_KEY)
+# 切回 Gemini 3.1 Pro 模型
+MODEL_ID = "gemini-3.1-pro"
 
 def get_arxiv_papers(topic, max_results=2):
     print(f"正在检索 ArXiv (计算机方向) ...")
@@ -80,55 +81,28 @@ def generate_summary(paper):
     5. Output strictly in Markdown format.
     """
     try:
-        # 使用 OpenAI 的 ChatCompletion 接口
-        response = client.chat.completions.create(
+        response = client.models.generate_content(
             model=MODEL_ID,
-            messages=[
-                {"role": "system", "content": "You are a highly skilled academic assistant."},
-                {"role": "user", "content": prompt}
-            ]
+            contents=prompt
         )
-        return response.choices[0].message.content
+        return response.text
     except Exception as e:
         return f"解读失败，错误信息：{e}"
-
-def push_to_wechat(content):
-    print("正在尝试推送到微信...")
-    token = os.getenv("PUSHPLUS_TOKEN")
-    if not token:
-        print("未检测到 PUSHPLUS_TOKEN，跳过推送。")
-        return
-        
-    url = "http://www.pushplus.plus/send"
-    data = {
-        "token": token,
-        "title": f"📅 基因表达量预测·日报 ({datetime.date.today()})",
-        "content": content,
-        "template": "markdown" 
-    }
-    try:
-        res = requests.post(url, json=data)
-        if res.status_code == 200:
-            print("🎉 微信推送成功！请在手机上查看。")
-        else:
-            print(f"推送失败，错误代码：{res.status_code}")
-    except Exception as e:
-        print(f"推送过程发生错误：{e}")
 
 def main():
     SEARCH_TOPIC = "gene expression prediction"
     papers = get_latest_papers(topic=SEARCH_TOPIC)
     
-    daily_report = ""
+    daily_report = f"# 📅 基因表达量预测·前沿论文日报 ({datetime.date.today()})\n\n"
+    
     for paper in papers:
         summary = generate_summary(paper)
         daily_report += f"**[来源: {paper['source']}]**\n"
         daily_report += f"{summary}\n🔗 原文链接: {paper['url']}\n---\n\n"
-        time.sleep(2) # 保护 API 速率限制
+        time.sleep(5) # 保护 API 速率限制
         
     print("\n==================== 生成结果 ====================\n")
     print(daily_report)
-    push_to_wechat(daily_report)
 
 if __name__ == "__main__":
     main()
