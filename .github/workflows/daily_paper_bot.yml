@@ -2,6 +2,7 @@ name: Daily AI Paper Digest
 
 on:
   schedule:
+    # 这里的 0 0 代表 UTC 时间的 0点0分，对应北京时间的早上 8:00
     - cron: '0 0 * * *'
   workflow_dispatch:
 
@@ -25,6 +26,7 @@ jobs:
 
     - name: Run paper summarizer
       env:
-        # 只要确保你的第三方 API Key 存在 GitHub Secrets 的 GOOGLE_API_KEY 里即可
         GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+        # 补回了微信推送令牌环境变量
+        PUSHPLUS_TOKEN: ${{ secrets.PUSHPLUS_TOKEN }}
       run: python main.py
