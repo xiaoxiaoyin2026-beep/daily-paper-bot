@@ -25,6 +25,5 @@ jobs:
 
     - name: Run paper summarizer
       env:
-        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        PUSHPLUS_TOKEN: ${{ secrets.PUSHPLUS_TOKEN }}
+        GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
       run: python main.py
