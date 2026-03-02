@@ -2,16 +2,21 @@ import arxiv
 import datetime
 import os
 import requests
-from google import genai
+from openai import OpenAI
 import time
 
-# 1. 密钥读取
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-if not GOOGLE_API_KEY:
+# 1. 密钥读取 (读取你在 GitHub 设置的 GOOGLE_API_KEY)
+API_KEY = os.getenv("GOOGLE_API_KEY")
+if not API_KEY:
     raise ValueError("未找到 GOOGLE_API_KEY 环境变量，请检查 GitHub Secrets！")
 
-client = genai.Client(api_key=GOOGLE_API_KEY)
-# 切回 Gemini 3.1 Pro 模型
+# 2. 关键修改：使用 OpenAI 库，但指向 ChatAi API 的端点
+client = OpenAI(
+    api_key=API_KEY,
+    base_url="https://api.chataiapi.com/v1"
+)
+
+# 使用中转站支持的 Gemini 3.1 Pro 模型名称
 MODEL_ID = "gemini-3.1-pro"
 
 def get_arxiv_papers(topic, max_results=2):
@@ -81,11 +86,15 @@ def generate_summary(paper):
     5. Output strictly in Markdown format.
     """
     try:
-        response = client.models.generate_content(
+        # 使用 OpenAI 兼容格式发送请求
+        response = client.chat.completions.create(
             model=MODEL_ID,
-            contents=prompt
+            messages=[
+                {"role": "system", "content": "You are a highly skilled academic assistant."},
+                {"role": "user", "content": prompt}
+            ]
         )
-        return response.text
+        return response.choices[0].message.content
     except Exception as e:
         return f"解读失败，错误信息：{e}"
 
@@ -99,7 +108,7 @@ def main():
         summary = generate_summary(paper)
         daily_report += f"**[来源: {paper['source']}]**\n"
         daily_report += f"{summary}\n🔗 原文链接: {paper['url']}\n---\n\n"
-        time.sleep(5) # 保护 API 速率限制
+        time.sleep(3) # 保护 API 速率限制
         
     print("\n==================== 生成结果 ====================\n")
     print(daily_report)
