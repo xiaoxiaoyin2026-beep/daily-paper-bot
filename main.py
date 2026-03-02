@@ -12,7 +12,7 @@ if not GOOGLE_API_KEY:
 
 # 使用全新版 SDK 初始化客户端
 client = genai.Client(api_key=GOOGLE_API_KEY)
-MODEL_ID = 'gemini-3.1-flash'
+MODEL_ID = 'gemini-2.0-flash'
 
 def get_arxiv_papers(topic, max_results=2):
     print(f"正在检索 ArXiv (计算机方向) ...")
