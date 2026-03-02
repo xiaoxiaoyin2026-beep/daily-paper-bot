@@ -5,18 +5,17 @@ import requests
 from openai import OpenAI
 import time
 
-# 1. 密钥读取 (读取你在 GitHub 设置的 GOOGLE_API_KEY)
+# 1. 密钥读取
 API_KEY = os.getenv("GOOGLE_API_KEY")
 if not API_KEY:
     raise ValueError("未找到 GOOGLE_API_KEY 环境变量，请检查 GitHub Secrets！")
 
-# 2. 关键修改：使用 OpenAI 库，但指向 ChatAi API 的端点
+# 2. 依然使用 OpenAI 库指向 ChatAi API 的端点
 client = OpenAI(
     api_key=API_KEY,
     base_url="https://api.chataiapi.com/v1"
 )
 
-# 使用中转站支持的 Gemini 3.1 Pro 模型名称
 MODEL_ID = "gemini-3.1-pro"
 
 def get_arxiv_papers(topic, max_results=2):
@@ -86,7 +85,6 @@ def generate_summary(paper):
     5. Output strictly in Markdown format.
     """
     try:
-        # 使用 OpenAI 兼容格式发送请求
         response = client.chat.completions.create(
             model=MODEL_ID,
             messages=[
@@ -97,6 +95,30 @@ def generate_summary(paper):
         return response.choices[0].message.content
     except Exception as e:
         return f"解读失败，错误信息：{e}"
+
+# 新增：微信推送专用函数
+def push_to_wechat(content):
+    print("正在尝试推送到微信...")
+    token = os.getenv("PUSHPLUS_TOKEN")
+    if not token:
+        print("未检测到 PUSHPLUS_TOKEN，跳过推送。")
+        return
+        
+    url = "http://www.pushplus.plus/send"
+    data = {
+        "token": token,
+        "title": f"📅 基因表达量预测·日报 ({datetime.date.today()})",
+        "content": content,
+        "template": "markdown" 
+    }
+    try:
+        res = requests.post(url, json=data)
+        if res.status_code == 200:
+            print("🎉 微信推送成功！请在手机上查看。")
+        else:
+            print(f"推送失败，错误代码：{res.status_code}")
+    except Exception as e:
+        print(f"推送过程发生错误：{e}")
 
 def main():
     SEARCH_TOPIC = "gene expression prediction"
@@ -112,6 +134,9 @@ def main():
         
     print("\n==================== 生成结果 ====================\n")
     print(daily_report)
+    
+    # 最后一步：调用推送函数将日报发到微信
+    push_to_wechat(daily_report)
 
 if __name__ == "__main__":
     main()
