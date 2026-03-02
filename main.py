@@ -1,18 +1,17 @@
 import arxiv
-from google import genai
 import datetime
 import os
 import requests
+from openai import OpenAI
+import time
 
-# 安全读取你在 GitHub Secrets 里配置的密钥
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+# 1. 密钥读取 (修改为读取 OpenAI 的密钥)
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+if not OPENAI_API_KEY:
+    raise ValueError("未找到 OPENAI_API_KEY 环境变量，请检查 GitHub Secrets！")
 
-if not GOOGLE_API_KEY:
-    raise ValueError("未找到 API 密钥，请检查 GitHub Secrets！")
-
-# 使用全新版 SDK 初始化客户端
-client = genai.Client(api_key=GOOGLE_API_KEY)
-MODEL_ID = 'gemini-1.5-flash-latest'
+client = OpenAI(api_key=OPENAI_API_KEY)
+MODEL_ID = "gpt-4o-mini"
 
 def get_arxiv_papers(topic, max_results=2):
     print(f"正在检索 ArXiv (计算机方向) ...")
@@ -21,7 +20,6 @@ def get_arxiv_papers(topic, max_results=2):
         max_results=max_results,
         sort_by=arxiv.SortCriterion.SubmittedDate
     )
-    
     arxiv_client = arxiv.Client()
     papers = []
     for result in arxiv_client.results(search):
@@ -35,18 +33,15 @@ def get_arxiv_papers(topic, max_results=2):
 
 def get_epmc_papers(topic, max_results=3):
     print(f"正在检索 PubMed/bioRxiv (生信医学方向) ...")
-    # Europe PMC 官方接口，同时覆盖 PubMed (MED) 和预印本如 bioRxiv (PPR)
     url = "https://www.ebi.ac.uk/europepmc/webservices/rest/search"
     query_str = f'("{topic}") AND (SRC:MED OR SRC:PPR)'
-    
     params = {
         "query": query_str,
         "format": "json",
         "resultType": "core",
         "pageSize": max_results,
-        "sort": "P_DATE_D" # 按发布日期倒序
+        "sort": "P_DATE_D"
     }
-    
     papers = []
     try:
         response = requests.get(url, params=params)
@@ -66,7 +61,6 @@ def get_epmc_papers(topic, max_results=3):
     return papers
 
 def get_latest_papers(topic="gene expression prediction"):
-    # 汇总各路数据（ArXiv 抓取 2 篇，PubMed/bioRxiv 抓取 3 篇，可自行调整）
     papers = []
     papers.extend(get_arxiv_papers(topic, max_results=2))
     papers.extend(get_epmc_papers(topic, max_results=3))
@@ -86,28 +80,55 @@ def generate_summary(paper):
     5. Output strictly in Markdown format.
     """
     try:
-        response = client.models.generate_content(
+        # 使用 OpenAI 的 ChatCompletion 接口
+        response = client.chat.completions.create(
             model=MODEL_ID,
-            contents=prompt
+            messages=[
+                {"role": "system", "content": "You are a highly skilled academic assistant."},
+                {"role": "user", "content": prompt}
+            ]
         )
-        return response.text
+        return response.choices[0].message.content
     except Exception as e:
         return f"解读失败，错误信息：{e}"
 
+def push_to_wechat(content):
+    print("正在尝试推送到微信...")
+    token = os.getenv("PUSHPLUS_TOKEN")
+    if not token:
+        print("未检测到 PUSHPLUS_TOKEN，跳过推送。")
+        return
+        
+    url = "http://www.pushplus.plus/send"
+    data = {
+        "token": token,
+        "title": f"📅 基因表达量预测·日报 ({datetime.date.today()})",
+        "content": content,
+        "template": "markdown" 
+    }
+    try:
+        res = requests.post(url, json=data)
+        if res.status_code == 200:
+            print("🎉 微信推送成功！请在手机上查看。")
+        else:
+            print(f"推送失败，错误代码：{res.status_code}")
+    except Exception as e:
+        print(f"推送过程发生错误：{e}")
+
 def main():
-    # 设定我们关注的核心交叉学科关键词
     SEARCH_TOPIC = "gene expression prediction"
-    
     papers = get_latest_papers(topic=SEARCH_TOPIC)
-    daily_report = f"# 📅 基因表达量预测·前沿论文日报 ({datetime.date.today()})\n\n"
     
+    daily_report = ""
     for paper in papers:
         summary = generate_summary(paper)
         daily_report += f"**[来源: {paper['source']}]**\n"
         daily_report += f"{summary}\n🔗 原文链接: {paper['url']}\n---\n\n"
+        time.sleep(2) # 保护 API 速率限制
         
     print("\n==================== 生成结果 ====================\n")
     print(daily_report)
+    push_to_wechat(daily_report)
 
 if __name__ == "__main__":
     main()
